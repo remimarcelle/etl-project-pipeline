@@ -1,7 +1,8 @@
+import logging
 from typing import List, Dict
-from src.logger import get_logger
+from utils.logger import get_logger
 
-logger = get_logger("deduplication", log_level=20)
+logger = get_logger("deduplication", log_level=logging.DEBUG)
 
 def deduplicate_data(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """

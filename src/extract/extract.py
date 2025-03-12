@@ -2,10 +2,11 @@ import csv
 from io import StringIO
 import os
 from typing import List, Dict, Optional, Union
+import logging
 from utils.logger import get_logger
 from utils.config_loader import load_config
 
-logger = get_logger("extract", log_level=20)  # Creates extract.log
+logger = get_logger("extract", log_level=logging.DEBUG)  # Creates extract.log
 
 # Load configuration
 config = load_config()

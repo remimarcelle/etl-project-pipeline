@@ -1,13 +1,14 @@
 from uuid import uuid4
 import csv
 import os
+import logging
 from typing import List, Dict, Any, Tuple
 from utils.logger import get_logger
 from utils.config_loader import load_config
 from src.transform.remove_sensitive_data import remove_pii
 from src.transform.deduplication import deduplicate_data
 
-logger = get_logger("transform", log_level=20)
+logger = get_logger("transform", log_level=logging.DEBUG)
 
 config = load_config()  # Load the default config.json file
 

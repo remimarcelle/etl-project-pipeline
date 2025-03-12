@@ -1,9 +1,10 @@
+import logging
 from src.extract.extract import extract_data
 from src.transform.transform import transform_data
 from src.load.load import load_data
-from src.logger import get_logger
+from utils.logger import get_logger
 
-logger = get_logger("app")
+logger = get_logger("app", log_level=logging.DEBUG)
 
 def main():
     """
@@ -32,3 +33,17 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# code i could posibly use
+from src.extract import extract_data
+from src.transform import transform_data
+from src.load import load_data
+
+def main():
+    file_path = "../data/raw-data.csv"
+    extracted_data = extract_data(file_path)
+
+    if extracted_data:
+        transformed_data = transform_data(extracted_data)
+        if transformed_data:
+            load_data(transformed_data)

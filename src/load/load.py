@@ -1,14 +1,15 @@
 import os
 import pymysql
 from pymysql.connections import Connection
+import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
-from src.logger import get_logger
+from utils.logger import get_logger
 
 # Load environment variables from .env file
 load_dotenv()
 
-logger = get_logger("load", log_level=20)
+logger = get_logger("load", log_level=logging.DEBUG)
 
 # Retrieve database credentials from environment variables.
 mysql_host: str = os.environ.get("mysql_host", "localhost")

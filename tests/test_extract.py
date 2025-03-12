@@ -2,44 +2,88 @@ import pytest
 from io import StringIO
 from src.extract.extract import extract_data
 
-def test_extract_data_from_stringio():
+@pytest.fixture
+def mock_config(mocker):
     """
-    Tests the extract_data function by simulating CSV input using StringIO.
-    
-    The test verifies:
-      - The function returns a non-None list.
-      - The number of rows extracted matches the input.
-      - Each row is a dictionary containing the desired keys in the proper order.
-      - A default value for 'Qty' ("1") is inserted.
+    Mock the configuration loader to ensure consistent test behavior.
     """
-    # Example CSV content following the assumed raw order:
-    # [Date/Time, Branch, Customer Name, Drink, Price, Payment Type, Card Number]
-    csv_content = (
-        "25/08/2021 09:00,Chesterfield,Dave Keys,Latte,£3.50,CARD,0123456\n"
-        "25/08/2021 09:08,London,Alice Franco,Cappuccino,£2.50,CARD,6543210\n"
-        "25/08/2021 10:11,Oxford,Michael Brown,Espresso,£1.50,CASH,\n"
-    )
+    mock_config = {
+        "default_headers": [
+            "Date/Time",
+            "Branch",
+            "Customer Name",
+            "Product",
+            "Price",
+            "Payment Type",
+            "Card Number"
+        ],
+        "default_qty": "1"
+    }
+    mocker.patch("utils.config_loader.load_config", return_value=mock_config)
+    return mock_config
+
+def test_valid_csv_file(mock_config):
+    """
+    Test the function with a valid CSV file.
+    """
+    csv_data = StringIO("""Date/Time,Branch,Customer Name,Product,Price,Payment Type,Card Number
+2023-04-05 12:00:00,Branch A,John Doe,Laptop,1200,Card,1234-5678-9123-4567
+2023-04-05 13:00:00,Branch B,Jane Smith,Tablet,800,Cash,5678-9123-4567-1234""")
     
-    # Wrap the CSV string in a StringIO object to simulate a file.
-    fake_file = StringIO(csv_content)
+    result = extract_data(csv_data)
+    assert len(result) == 2
+    assert result[0] == {
+        "customer_name": "John Doe",
+        "product": "Laptop",
+        "qty": "1",
+        "price": "1200",
+        "branch": "Branch A",
+        "payment_type": "Card",
+        "card_number": "1234-5678-9123-4567",
+        "date_time": "2023-04-05 12:00:00"
+    }
+
+def test_missing_file(mock_config):
+    """
+    Test the function with a missing file path.
+    """
+    result = extract_data("non_existent_file.csv")
+    assert result is None
+
+def test_file_with_header_row(mock_config):
+    """
+    Test the function with a file that includes a header row.
+    """
+    csv_data = StringIO("""Date/Time,Branch,Customer Name,Product,Price,Payment Type,Card Number
+Date/Time,Branch,Customer Name,Product,Price,Payment Type,Card Number
+2023-04-05 12:00:00,Branch A,John Doe,Laptop,1200,Card,1234-5678-9123-4567""")
     
-    # Call the extract_data function using the file-like object.
-    data = extract_data(fake_file)
+    result = extract_data(csv_data)
+    assert len(result) == 1
+    assert result[0]["customer_name"] == "John Doe"
+
+def test_insufficient_fields(mock_config):
+    """
+    Test the function with rows that have missing fields.
+    """
+    csv_data = StringIO("""Date/Time,Branch,Customer Name,Product,Price,Payment Type,Card Number
+2023-04-05 12:00:00,Branch A,John Doe,Laptop,1200,,1234-5678-9123-4567""")
     
-    # Assert that data was extracted and the output is a list.
-    assert data is not None, "Extraction returned None; expected a list of dictionaries."
-    assert isinstance(data, list), f"Expected data to be a list, but got {type(data)}."
-    
-    # The sample CSV has 3 rows, so we expect 3 dictionaries.
-    assert len(data) == 3, f"Expected 3 rows but got {len(data)} rows."
-    
-    # Define the desired keys for each dictionary.
-    desired_keys = ["Customer Name", "Drink", "Qty", "Price", "Branch", "Payment Type", "Card Number", "Date/Time"]
-    
-    # Verify that each row contains all of the desired keys.
-    for idx, row in enumerate(data, start=1):
-        for key in desired_keys:
-            assert key in row, f"Row {idx} is missing the key '{key}'. Row data: {row}"
-        
-        # Verify that the default quantity is set correctly.
-        assert row["Qty"] 
+    result = extract_data(csv_data)
+    assert len(result) == 0  # The row should be skipped
+
+def test_empty_file(mock_config):
+    """
+    Test the function with an empty file.
+    """
+    csv_data = StringIO("")
+    result = extract_data(csv_data)
+    assert result == []
+
+def test_file_with_duplicate_header_row(mock_config):
+    csv_data = StringIO("""Date/Time,Branch,Customer Name,Product,Price,Payment Type,Card Number
+Date/Time,Branch,Customer Name,Product,Price,Payment Type,Card Number
+2023-04-05 12:00:00,Branch A,John Doe,Laptop,1200,Card,1234-5678-9123-4567""")
+    result = extract_data(csv_data)
+    assert len(result) == 1
+    assert result[0]["customer_name"] == "John Doe"

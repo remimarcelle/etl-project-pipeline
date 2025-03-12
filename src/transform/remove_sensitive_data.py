@@ -1,8 +1,9 @@
+import logging
 from typing import List, Dict
-from src.logger import get_logger
+from utils.logger import get_logger
 import copy
 
-logger = get_logger("remove_sensitive_data", log_level=20)
+logger = get_logger("remove_sensitive_data", log_level=logging.DEBUG)
 
 def remove_pii(data: List[Dict[str, str]], sensitive_fields: List[str] = None) -> List[Dict[str, str]]:
     """

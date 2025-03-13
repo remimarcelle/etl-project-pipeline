@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Tuple
 from utils.logger import get_logger
 from utils.config_loader import load_config
 from src.transform.remove_sensitive_data import remove_pii
-from src.transform.deduplication import deduplicate_data
+from transform.remove_duplicates import deduplicate_data
 
 logger = get_logger("transform", log_level=logging.DEBUG)
 
@@ -58,7 +58,7 @@ def parse_product_field(record: Dict[str, str]) -> Dict[str, Any]:
         # If multiple entries are present, split by commas; otherwise create a list with one entry.
         entries = [entry.strip() for entry in product_field.split(",")] if "," in product_field else [product_field]
         parsed_products = []
-        total_price = 0.0
+        total_price: float = 0.0
 
         for entry in entries:
             parts = entry.split(" - ", maxsplit=2)
@@ -68,7 +68,7 @@ def parse_product_field(record: Dict[str, str]) -> Dict[str, Any]:
                 size = ""
                 flavour = ""
                 try:
-                    price_val = float(parts[1].strip())
+                    price_val: float = float(parts[1].strip())
                 except ValueError:
                     logger.warning(f"Invalid price '{parts[1]}' in entry '{entry}'.")
                     continue
@@ -103,7 +103,7 @@ def parse_product_field(record: Dict[str, str]) -> Dict[str, Any]:
 
         if parsed_products:
             record["parsed_products"] = parsed_products
-            record["price"] = str(total_price)
+            record["price"] = f"{total_price:.2f}"
         return record
     except Exception as e:
         logger.error(f"Error parsing product field in record {record}: {e}")
@@ -145,16 +145,16 @@ def normalise_branches(data: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]]
             - branches_table: A list of unique branch records.
             - updated_transactions: Transactions updated with "branch_id" instead of "branch".
     """
-    branches = []
-    updated_transactions = []
-    branch_ids = {}
+    branches = List[Dict[str, str]] = []
+    updated_transactions = List[Dict[str, str]] = []
+    branch_ids = Dict[str, str] = {}
     for record in data:
         branch = record.get("branch", "").strip()
         if not branch:
             logger.warning(f"Record missing branch info: {record}")
             continue
         if branch not in branch_ids:
-            branch_id = str(uuid4())
+            branch_id: str = str(uuid4())
             branch_ids[branch] = branch_id
             branches.append({"id": branch_id, "name": branch})
         new_record = record.copy()
@@ -183,10 +183,10 @@ def normalise_products(transactions: List[Dict[str, Any]]) -> Tuple[List[Dict[st
             - updated_transactions: Transactions updated with "product_id".
             - transaction_product_table: Records mapping transaction_id to product_id.
     """
-    products_table = []
-    updated_transactions = []
-    transaction_product_table = []
-    product_ids = {}
+    products_table: List[Dict[str, str]] = []
+    updated_transactions: List[Dict[str, Any]] = []
+    transaction_product_table: List[Dict[str, str]] = []
+    product_ids: Dict[tuple, str] = {}
 
     for record in transactions:
         parsed_products = record.get("parsed_products")
@@ -280,7 +280,7 @@ def process_transactions(data: List[Dict[str, str]]) -> Tuple[
         cleaned_records = remove_pii(parsed_records)
         logger.info("Sensitive information removed from records.")
         
-        # Deduplicate records.
+        # Remove duplicate records.
         first_normalised_form = deduplicate_data(cleaned_records)
         logger.info(f"Deduplication complete: {len(first_normalised_form)} unique records remain.")
         
@@ -322,8 +322,7 @@ def write_csv(data: List[Dict[str, Any]], filename: str) -> None:
 def write_normalised_csv_files(
     final_transactions: List[Dict[str, Any]],
     second_normalised: Tuple[List[Dict[str, str]], List[Dict[str, str]]],
-    third_normalised: Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]]
-) -> None:
+    third_normalised: Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]]) -> None:
     """
     Writes the normalised data into separate CSV files.
     
@@ -351,6 +350,11 @@ def write_normalised_csv_files(
         "product": f"product-{branch_name}.csv",
         "transaction_product": f"transaction_product-{branch_name}.csv"
     }
+
+    # Ensure the output directory exists.
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
 
     write_csv(final_transactions, os.path.join("output", filenames["transaction"]))
     write_csv(branches_table, os.path.join("output", filenames["branch"]))

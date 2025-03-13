@@ -52,26 +52,8 @@ try:
         cursor = connection.cursor()
 
         logger.info("Inserting new records into the database...")
-        insert_query = """
-        INSERT INTO transactions (date_time, branch, drink, size, price, qty, payment_type)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        transaction_values = [
-            (
-                t["date_time"],
-                t["branch"],
-                t["drink"],
-                t["size"],
-                t["price"],
-                t["qty"],
-                t["payment_type"]
-            )
-            for t in transactions
-        ]
-        cursor.executemany(insert_query, [tuple(t.values()) for t in transactions])
-        logger.info(f"Successfully loaded {cursor.rowcount} records into the database.")
 
-        #Insert branches table
+         #Insert branches table
         branch_query = "INSERT INTO branches (id, name) VALUES (%s, %s)"
         branch_values = [
                 (
@@ -82,7 +64,26 @@ try:
         cursor.executemany(branch_query, [tuple(b.values()) for b in branches])
         logger.info(f"Inserted {cursor.rowcount} records into branches.")
 
-        # Insert product table
+        # insert transaction table
+        insert_query = """
+        INSERT INTO transactions (id, date_time, branch_id, price, qty, payment_type)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        transaction_values = [
+            (
+                t["id"],
+                t["date_time"],
+                t["branch_id"],
+                t["price"],
+                t["qty"],
+                t["payment_type"]
+            )
+            for t in transactions
+        ]
+        cursor.executemany(insert_query, [tuple(t.values()) for t in transactions])
+        logger.info(f"Successfully loaded {cursor.rowcount} records into the database.")
+
+         # Insert product table
 
         product_query = """
         INSERT INTO products (id, product_name, size, flavour, price)

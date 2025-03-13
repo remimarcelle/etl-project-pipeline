@@ -1,24 +1,25 @@
 version: '3.8'
 services:
-  db:
+  mysql:
     image: mysql:latest
-    container_name: mysql_container
+    container_name: rmb_de_mysql_ETLproject
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: "${mysql-pass}"
-      MYSQL_DATABASE: cafe
+      MYSQL_ROOT_PASSWORD: "${mysql_pass}"  
+      MYSQL_DATABASE: "${mysql_db}"
     ports:
       - "3306:3306"
     volumes:
       - type: volume
         source: my_db_files
         target: /var/lib/mysql
+
   adminer:
     image: adminer
-    container_name: adminer_container
+    container_name: rmb_de_adminer_ETLproject
     restart: always
     ports:
       - "8080:8080"
 
 volumes:
-  my_db_files::
+  my_db_files:

@@ -2,7 +2,7 @@ import logging
 from typing import List, Dict
 from utils.logger import get_logger
 
-logger = get_logger("deduplication", log_level=logging.DEBUG)
+logger = get_logger("remove_duplicates", log_level=logging.DEBUG)
 
 def deduplicate_data(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
@@ -17,10 +17,10 @@ def deduplicate_data(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     Returns:
         List[Dict[str, str]]: Unique data.
     Raises:
-        Exception: If an unexpected error occurs during deduplication.
+        Exception: If an unexpected error occurs during removal of duplicates.
     """
     try:
-        logger.info("Starting deduplication of data...")
+        logger.info("Starting removal of duplicate data...")
         seen = set()
         unique_data = []
         for row in data:
@@ -29,8 +29,8 @@ def deduplicate_data(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
             if unique_key not in seen:
                 seen.add(unique_key)
                 unique_data.append(row)
-        logger.info(f"Deduplication complete. {len(unique_data)} unique rows remaining.")
+        logger.info(f"Duplicates removed. {len(unique_data)} unique rows remaining.")
         return unique_data
     except Exception as e:
-        logger.error(f"Error during deduplication: {e}")
+        logger.error(f"Error during the removal of duplicates: {e}")
         raise

@@ -11,7 +11,7 @@ logger = get_logger("extract", log_level=logging.DEBUG)  # Creates extract.log
 # Load configuration
 config = load_config()
 
-def extract_data(file_input: Union[str, StringIO]) -> Optional[List[Dict[str, str]]]:
+def extract_data(file_input: Union[str, StringIO], has_header: bool = True) -> Optional[List[Dict[str, str]]]:
     """
     Extracts records from a CSV file (or file-like object) that lacks a proper header row,
     then reorders each row into a dictionary with snake_case keys.
@@ -55,33 +55,68 @@ def extract_data(file_input: Union[str, StringIO]) -> Optional[List[Dict[str, st
 
         elif isinstance(file_input, StringIO):
             logger.info("Extraction taking place")
-            reader = csv.DictReader(csv_file, fieldnames=default_headers)
+            reader = csv.DictReader(file_input, fieldnames=default_headers)
             raw_data: List[Dict[str, str]] = list(reader)
         else:
             logger.error("Invalid file input type. Expected a file path (str) or file-like object (StringIO).")
             return None
 
-        # Optional: if the file accidentally contains a header row, skip it.
-        if raw_data and raw_data[0].get("Date/Time", "").strip() == "Date/Time":
-            logger.info("Detected header row in file; skipping it.")
-            raw_data = raw_data[1:]
+        # Optionally remove the header row if 'has_header' is True.
+        if has_header and raw_data:
+            # Normalize: strip spaces and convert values to lowercase for comparison.
+            first_row_values = {value.strip().lower() for value in raw_data[0].values()}
+            expected_values = {header.strip().lower() for header in default_headers}
+            if first_row_values == expected_values:
+                logger.info("Detected header row in file; skipping it.")
+                raw_data = raw_data[1:]
 
         parsed_data: List[Dict[str, str]] = []
         for row_number, row in enumerate(raw_data, start=1):
-            # Check if the row contains all required fields; if not, log a warning and skip.
-            if len(row) < len(default_headers):
-                logger.warning(f"Row {row_number} skipped due to insufficient fields: {row} (expected {len(default_headers)} fields).")
+            # Retrieve and normalize the payment type.
+            try:
+                payment_type: str = row["Payment Type"].strip()
+            except KeyError:
+                logger.warning(f"Row {row_number} skipped due to missing 'Payment Type': {row}")
                 continue
-            try: 
+                    
+            # Define the list of required headers.
+            # If payment type is cash, exclude "Card Number" from required fields.
+            if payment_type.upper() == "CASH":
+                required_fields = [header for header in default_headers if header != "Card Number"]
+            else:
+                required_fields = default_headers
+
+            # Check that all required fields are present and non-empty.
+            # If any required field is missing or empty, skip the row.
+            missing_field = False
+            for header in required_fields:
+                if header not in row or not row[header].strip():
+                    logger.warning(f"Row {row_number} skipped due to missing or empty field '{header}': {row}")
+                    missing_field = True
+                    break
+            if missing_field:
+                continue
+
+            try:
+                try:
+                    # Convert the Price field to a float and then format it to two decimals.
+                    price: str = f"{float(row['Price'].strip()):.2f}"
+                except ValueError:
+                    logger.warning(f"Row {row_number} skipped due to invalid price value: {row['Price']}")
+                    continue
+
+                # Determine the card number: if payment_type is cash, use an empty string.
+                card_number: str = row["Card Number"].strip() if payment_type.upper() != "CASH" else ""
+
                 # Reorder and rename keys using snake_case.
                 mapped_row: Dict[str, str] = {
                     "customer_name": row["Customer Name"].strip(),
                     "product": row["Product"].strip(),
                     "qty": default_qty,  # Default quantity since not in raw data.
-                    "price": row["Price"].strip(),
+                    "price": price,
                     "branch": row["Branch"].strip(),
-                    "payment_type": row["Payment Type"].strip(),
-                    "card_number": row["Card Number"].strip(),
+                    "payment_type": payment_type,
+                    "card_number": card_number,
                     "date_time": row["Date/Time"].strip()
                 }
                 parsed_data.append(mapped_row)

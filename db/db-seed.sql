@@ -16,8 +16,8 @@ VALUES
 -- Insert initial data into the transactions table
 INSERT INTO transactions (branch_id, date_time, qty, price, payment_type)
 VALUES 
-    ((SELECT id FROM branches WHERE name='Chesterfield'), '2023-04-01 10:00:00', 2, 5.00),
-    ((SELECT id FROM branches WHERE name='Chesterfield'), '2023-04-01 11:00:00', 1, 2.50); 
+    ((SELECT id FROM branches WHERE name='Chesterfield'), '2023-04-01 10:00:00', 2, 5.00, 'Cash'),
+    ((SELECT id FROM branches WHERE name='Chesterfield'), '2023-04-01 11:00:00', 1, 2.50, 'Card');
 
 -- Map transactions to products in the transaction_product table
 INSERT INTO transaction_product (transaction_id, product_id)

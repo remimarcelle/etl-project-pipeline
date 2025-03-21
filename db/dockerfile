@@ -1,0 +1,20 @@
+# Use the full Python 3.9 image instead of the slim version.
+FROM python:3.9
+
+# Set the working directory inside the container to /app
+WORKDIR /app
+
+# Copy the entire project into the container
+COPY . /app
+
+# Update package lists and install needed system libraries (e.g., for MySQL client support)
+RUN apt-get update && apt-get install -y \
+    default-libmysqlclient-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies without using the cache for smaller layers
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Specify the command that runs your ETL pipeline; adjust the path if necessary.
+CMD ["python", "src/app.py"]
+

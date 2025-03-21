@@ -6,6 +6,7 @@ import logging
 from utils.logger import get_logger
 from utils.config_loader import load_config
 
+
 logger = get_logger("extract", log_level=logging.DEBUG)  # Creates extract.log
 
 # Load configuration
@@ -61,12 +62,11 @@ def extract_data(file_input: Union[str, StringIO], has_header: bool = True) -> O
             logger.error("Invalid file input type. Expected a file path (str) or file-like object (StringIO).")
             return None
 
-        # Optionally remove the header row if 'has_header' is True.
-        if has_header and raw_data:
-            # Normalize: strip spaces and convert values to lowercase for comparison.
-            first_row_values = {value.strip().lower() for value in raw_data[0].values()}
-            expected_values = {header.strip().lower() for header in default_headers}
-            if first_row_values == expected_values:
+        # If the first row contains headers (ignoring case and whitespace), skip it.
+        if raw_data:
+            first_row_vals = {str(val).strip().lower() for val in raw_data[0].values()}
+            expected_vals = {header.strip().lower() for header in default_headers}
+            if first_row_vals == expected_vals:
                 logger.info("Detected header row in file; skipping it.")
                 raw_data = raw_data[1:]
 

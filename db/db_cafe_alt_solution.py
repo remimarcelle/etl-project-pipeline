@@ -10,118 +10,125 @@ load_dotenv()
 
 logger = get_logger("load", log_level=logging.DEBUG)
 
-def load_data(
-    transactions: List[Dict[str, Any]],
-    branches: List[Dict[str, Any]],
-    products: List[Dict[str, Any]],
-    transaction_product: List[Dict[str, Any]]) -> None:
-     """
+def load_data(transformed_data: Dict[str, Any]) -> None:
+    """
     Loads transformed data into MySQL database tables for transactions, branches,
     products, and the transaction_product mapping table.
 
-    This function connects to the database using credentials from environment variables,
-    inserts data into four tables in a single connection using executemany for batch processing,
-    commits the transaction, and closes the connection.
+    The transformed_data dictionary is expected to contain the following keys:
+        "final_transactions": A list of transactions with keys such as "id", "branch_id", "date_time", 
+                                                                "price", "qty", and "payment_type".
+        "branch_data": A dictionary with keys:
+            - "branches_table": A list of branch records (each with "id" and "name").
+            - "transactions_with_branch_id": A list of transactions updated with "branch_id".
+        "product_data": A dictionary with keys:
+            - "products_table": A list of product records with keys "id", "product_name",
+                                "size", "flavour", and "price".
+            - "transactions_with_product_id": A list of transactions updated with "product_id".
+            - "transaction_product_table": A list of mappings with keys "id", "transaction_id",
+                                             and "product_id".
 
     Args:
-        transactions (List[Dict[str, Any]]): A list of transactions with keys such as
-            "date_time", "branch", "drink", "size", "price", "qty", "payment_type".
-        branches (List[Dict[str, Any]]): A list of branch records with keys "id" and "name".
-        products (List[Dict[str, Any]]): A list of product records with keys "id", "product_name",
-            "size", "flavour", "price".
-        transaction_product (List[Dict[str, Any]]): A list of mapping records with keys "id",
-            "transaction_id", and "product_id".
+        transformed_data (Dict[str, Any]): The transformed data produced by the ETL pipeline.
 
     Returns:
         None
 
     Raises:
-        Exception: If an error occurs during database operations.
+        Exception: If an error occurs during the database operations.
     """
-try:
-    logger.info("Connecting to database...")
-    # retrieve db credentials from environment variables
-    with pymysql.connect(
+    # Extract the parts from the transformed data dictionary.
+    final_transactions = transformed_data["final_transactions"]
+    branch_data = transformed_data["branch_data"]
+    product_data = transformed_data["product_data"]
+
+    # Define variables for clarity.
+    branches = branch_data.get("branches_table", [])
+    transactions = final_transactions  # Final transactions are already updated.
+    products = product_data.get("products_table", [])
+    transaction_product = product_data.get("transaction_product_table", [])
+
+    try:
+        logger.info("Connecting to database...")
+        with pymysql.connect(
             host=os.getenv("mysql_host", "localhost"),
             user=os.getenv("mysql_user", "root"),
             password=os.getenv("mysql_pass", ""),
             database=os.getenv("mysql_db", "cafe")
         ) as connection:
+            with connection.cursor() as cursor:
+                logger.info("Inserting new records into the database...")
 
-        logger.info("opening cursor...")
-        cursor = connection.cursor()
+                # Insert branches table
+                branch_query = "INSERT INTO branches (id, name) VALUES (%s, %s)"
+                cursor.executemany(branch_query, [(b["id"], b["name"]) for b in branches])
+                logger.info(f"Inserted {cursor.rowcount} records into branches.")
 
-        logger.info("Inserting new records into the database...")
+                # Insert transactions table
+                transaction_query = """
+                    INSERT INTO transactions (id, branch_id, date_time price, qty, payment_type)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """
+                cursor.executemany(
+                    transaction_query,
+                    [
+                        (
+                            t["id"],
+                            t["branch_id"],
+                            t["date_time"],
+                            t["price"],
+                            t["qty"],
+                            t["payment_type"]
+                        )
+                        for t in transactions
+                    ]
+                )
+                logger.info(f"Inserted {cursor.rowcount} records into transactions.")
 
-         #Insert branches table
-        branch_query = "INSERT INTO branches (id, name) VALUES (%s, %s)"
-        branch_values = [
-                (
-                        b["id"], 
-                        b["name"]
-                )       
-                for b in branches]
-        cursor.executemany(branch_query, [tuple(b.values()) for b in branches])
-        logger.info(f"Inserted {cursor.rowcount} records into branches.")
+                # Insert products table
+                product_query = """
+                    INSERT INTO products (id, product_name, size, flavour, price)
+                    VALUES (%s, %s, %s, %s, %s)
+                """
+                cursor.executemany(
+                    product_query,
+                    [
+                        (
+                            p["id"],
+                            p["product_name"],
+                            p["size"],
+                            p["flavour"],
+                            p["price"]
+                        )
+                        for p in products
+                    ]
+                )
+                logger.info(f"Inserted {cursor.rowcount} records into products.")
 
-        # insert transaction table
-        insert_query = """
-        INSERT INTO transactions (id, date_time, branch_id, price, qty, payment_type)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        transaction_values = [
-            (
-                t["id"],
-                t["date_time"],
-                t["branch_id"],
-                t["price"],
-                t["qty"],
-                t["payment_type"]
-            )
-            for t in transactions
-        ]
-        cursor.executemany(insert_query, [tuple(t.values()) for t in transactions])
-        logger.info(f"Successfully loaded {cursor.rowcount} records into the database.")
+                # Insert transaction_product mapping
+                tp_query = """
+                    INSERT INTO transaction_product (id, transaction_id, product_id)
+                    VALUES (%s, %s, %s)
+                """
+                cursor.executemany(
+                    tp_query,
+                    [
+                        (
+                            tp["id"],
+                            tp["transaction_id"],
+                            tp["product_id"]
+                        )
+                        for tp in transaction_product
+                    ]
+                )
+                logger.info(f"Inserted {cursor.rowcount} records into transaction_product.")
 
-         # Insert product table
+            # Commit the transaction after all inserts
+            connection.commit()
+            logger.info("Transaction committed successfully.")
 
-        product_query = """
-        INSERT INTO products (id, product_name, size, flavour, price)
-        VALUES (%s, %s, %s, %s, %s)
-        """
-        product_values = [
-            (
-                    p["id"], 
-                    p["product_name"], 
-                    p["size"], 
-                    p["flavour"], 
-                    p["price"]
-            ) 
-            for p in products]
-        cursor.executemany(product_query, [tuple(p.values()) for p in products])
-        logger.info(f"Inserted {cursor.rowcount} records into products.")
-
-        # Insert transaction_product table
-
-        tp_query = """
-        INSERT INTO transaction_product (id, transaction_id, product_id)
-        VALUES (%s, %s, %s)
-        """
-        tp_values = [
-            (
-                    tp["id"], 
-                    tp["transaction_id"], 
-                    tp["product_id"]
-            ) 
-            for tp in transaction_product]
-        cursor.executemany(tp_query, [tuple(tp.values()) for tp in transaction_product])
-        logger.info(f"Inserted {cursor.rowcount} records into transaction_product.")
-
-
-        connection.committ()
-        cursor.close()
-        connection.close()
-        logger.info("Database connection closed.")
-
-except Exception as e:
-    logger.error(f"Error loading data: {e}")
+        # Log database disconnection explicitly
+        logger.info("Database connection closed via context manager automatically.")
+    except Exception as e:
+        logger.error(f"Error loading data: {e}")
+        raise

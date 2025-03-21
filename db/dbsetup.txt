@@ -1,0 +1,44 @@
+# Instructions to Set Up the Database Environment
+
+1. Start the Docker containers for MySQL and Adminer:
+   - Command: `docker-compose up -d`
+
+    Ensure your `docker-compose.yml` file includes the MySQL container definition, similar to this:
+   ```yaml
+   version: '3.8'
+   services:
+     mysql:
+       image: mysql:latest
+       container_name: mysql_ETLproject
+       environment:
+         MYSQL_ROOT_PASSWORD: (Your Password)
+         MYSQL_DATABASE: cafe
+       ports:
+         - "3306:3306"
+
+     adminer:
+       image: adminer
+       container_name: adminer_ETLproject
+       ports:
+         - "8080:8080"
+
+2. Connect to Adminer:
+   - URL: http://localhost:8080
+   - Credentials:
+     - System: MySQL
+     - Server: mysql
+     - Username: root
+     - Password: (from .env)
+     - Database: cafe
+
+3. Set Up the Database Schema:
+   - Load the schema from `db/db-loadsql.sql` into the database.
+
+4. Seed the Database (Optional):
+   - Run `db/db-seed.sql` to insert initial data into the tables.
+
+5. Verify the Database:
+   - Use Adminer or SQL queries to confirm the tables and data.
+
+6. Run the ETL Pipeline:
+   - Execute `src/app.py` to process data and populate the database.

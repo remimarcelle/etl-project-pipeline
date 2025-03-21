@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Tuple
 from utils.logger import get_logger
 from utils.config_loader import load_config
 from src.transform.remove_sensitive_data import remove_pii
-from transform.remove_duplicates import deduplicate_data
+from src.transform.remove_duplicates import deduplicate_data
 
 logger = get_logger("transform", log_level=logging.DEBUG)
 
@@ -34,7 +34,7 @@ def parse_product_field(record: Dict[str, str]) -> Dict[str, Any]:
     Supports several formats:
       - Simple entry, e.g. "iced latte - 2.50".  
         (Here "iced latte" is treated as a single product name, since "iced" is not in known_sizes.)
-      - Detailed entry, e.g. "Large Latte - Hazelnut - 2.45".  
+      - Detailed entry, e.g. "Large Latte - Hazelnut - 2.45".   
         If the first token (after splitting by space) is in known_sizes, it is taken as the size;
         the next token(s) form the product name; any additional token (if present) is taken as flavour.
       - Multiple entries separated by commas, e.g.  
@@ -145,9 +145,10 @@ def normalise_branches(data: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]]
             - branches_table: A list of unique branch records.
             - updated_transactions: Transactions updated with "branch_id" instead of "branch".
     """
-    branches = List[Dict[str, str]] = []
-    updated_transactions = List[Dict[str, str]] = []
-    branch_ids = Dict[str, str] = {}
+    branches: List[Dict[str, str]] = []
+    updated_transactions: List[Dict[str, str]] = []
+    branch_ids: Dict[str, str] = {}
+
     for record in data:
         branch = record.get("branch", "").strip()
         if not branch:
@@ -226,39 +227,24 @@ def normalise_products(transactions: List[Dict[str, Any]]) -> Tuple[List[Dict[st
     logger.info(f"Normalised products: found {len(products_table)} unique product records.")
     return products_table, updated_transactions, transaction_product_table
 
-def process_transactions(data: List[Dict[str, str]]) -> Tuple[
-    List[Dict[str, Any]],
-    Tuple[List[Dict[str, str]], List[Dict[str, str]]],
-    Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]],
-    List[Dict[str, Any]]
-]:
+def transform_data(data: List[Dict[str, str]]) -> Dict[str, Any]:
     """
-    Processes and normalises transaction data into four distinct outputs:
+    Processes and normalises transaction data into a structured dictionary containing:
     
-    - first_normalised_form:
-         Cleaned, deduplicated transactions after filtering for required fields, drink parsing,
-         sensitive data removal, and deduplication.
-    - second_normalised_form:
-         A tuple (branches_table, transactions_with_branch_id) from branch normalisation.
-    - third_normalised_form:
-         A tuple (drinks_table, transactions_with_drink_id, transaction_drink_table) from drink normalisation.
-    - fourth_normalised_form:
-         The final transaction records ready for loading.
+    - final_transactions: Final processed transactions ready for loading.
+    - branch_data: A dictionary containing:
+        - branches_table: Unique branch records.
+        - transactions_with_branch_id: Transactions updated with a branch_id.
+    - product_data: A dictionary containing:
+        - products_table: Unique product records.
+        - transactions_with_product_id: Transactions updated with product_id.
+        - transaction_product_table: A mapping of transaction_id to product_id.
     
     Args:
         data (List[Dict[str, str]]): Extracted transaction records.
     
     Returns:
-        Tuple[
-            List[Dict[str, Any]], 
-            Tuple[List[Dict[str, str]], List[Dict[str, str]]],
-            Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]],
-            List[Dict[str, Any]]
-        ]: A tuple containing:
-            - final_transactions (fourth_normalised_form),
-            - second_normalised_form: (branches_table, transactions with branch_id),
-            - third_normalised_form: (drinks_table, transactions with drink_id, transaction_drink_table),
-            - first_normalised_form is the cleaned, deduplicated transactions before further normalisation.
+        Dict[str, Any]: A dictionary with keys "final_transactions", "branch_data", and "product_data".
     
     Raises:
         Exception: If transaction processing fails.
@@ -268,11 +254,11 @@ def process_transactions(data: List[Dict[str, str]]) -> Tuple[
         
         # Filter out records missing required fields.
         valid_records = [r for r in data if all(r.get(k, "").strip() for k in [
-            "Customer Name", "drink", "qty", "price", "branch", "payment_type", "date_time"
+            "Customer Name", "product", "qty", "price", "branch", "payment_type", "date_time"
         ])]
         logger.info(f"{len(valid_records)} records remain after filtering for required fields.")
         
-        # Parse the 'drink' field.
+        # Parse the 'product' field.
         parsed_records = [parse_product_field(record) for record in valid_records]
         logger.info("Product field parsing complete.")
         
@@ -286,17 +272,30 @@ def process_transactions(data: List[Dict[str, str]]) -> Tuple[
         
         # Normalise branch data.
         branches_table, transactions_with_branch_id = normalise_branches(first_normalised_form)
-        second_normalised_form = (branches_table, transactions_with_branch_id)
+        # second_normalised_form = (branches_table, transactions_with_branch_id)
         
-        # Normalise drink data and produce a transaction_product mapping table.
+        # Normalise product data and produce a transaction_product mapping table.
         products_table, transactions_with_product_id, transaction_product_table = normalise_products(transactions_with_branch_id)
-        third_normalised_form = (products_table, transactions_with_product_id, transaction_product_table)
+        # third_normalised_form = (products_table, transactions_with_product_id, transaction_product_table)
         
         # Final transactions (fourth normalised form) are those after product normalisation.
-        fourth_normalised_form = transactions_with_product_id
+        final_transactions = transactions_with_product_id
         
         logger.info("Transaction processing and normalisation complete.")
-        return fourth_normalised_form, second_normalised_form, third_normalised_form, fourth_normalised_form
+        
+        # Construct a self-documenting return structure.
+        return {
+            "final_transactions": final_transactions,
+            "branch_data": {
+                "branches_table": branches_table,
+                "transactions_with_branch_id": transactions_with_branch_id,
+            },
+            "product_data": {
+                "products_table": products_table,
+                "transactions_with_product_id": transactions_with_product_id,
+                "transaction_product_table": transaction_product_table,
+            }
+        }
     except Exception as e:
         logger.error(f"Failed to process transactions: {e}")
         raise
@@ -337,7 +336,7 @@ def write_normalised_csv_files(
     Args:
         final_transactions (List[Dict[str, Any]]): Final transaction records.
         second_normalised (Tuple[List[Dict[str, str]], List[Dict[str, str]]]): Tuple (branches_table, transactions with branch_id).
-        third_normalised (Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]]): Tuple (drinks_table, transactions with drink_id, transaction_drink_table).
+        third_normalised (Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]]): Tuple (products_table, transactions with product_id, transaction_product_table).
     """
     branches_table, _ = second_normalised
     if not branches_table:

@@ -8,6 +8,14 @@ from uuid import uuid4
 
 import pytest
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    ch = logging.StreamHandler()  # This sends logs to the console
+    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
 # Import the transformation functions from your transform module.
 from src.transform.transform import (
     standardise_product_name,
@@ -15,7 +23,7 @@ from src.transform.transform import (
     filter_valid_records,
     normalise_branches,
     normalise_products,
-    process_transactions,
+    transform_data,
     write_csv,
     write_normalised_csv_files
 )
@@ -159,30 +167,71 @@ def test_normalise_products() -> None:
 # -----------------------------
 # Section 6: Test processing transactions
 # -----------------------------
-def test_process_transactions() -> None:
+def test_transform_data() -> None:
     """
     Tests the complete transaction processing pipeline.
     
-    The function should return a tuple with the following elements:
-        - A list of final transactions.
-        - A tuple (branches_table, transactions with branch_id).
-        - A tuple (products_table, transactions with product_id, transaction_product mapping table).
-        - A list of final transactions again.
+    The function should return a dictionary with the following keys:
+        - "final_transactions": The final processed transactions ready for loading.
+        - "branch_data": A dictionary containing:
+            - "branches_table": A list of branch records.
+            - "transactions_with_branch_id": A list of transactions updated with branch_id.
+        - "product_data": A dictionary containing:
+            - "products_table": A list of product records.
+            - "transactions_with_product_id": A list of transactions updated with product_id.
+            - "transaction_product_table": A list of transaction-product mapping records.
+    
     
     Returns:
         None.
     """
     sample_data: List[Dict[str, str]] = [
-        {"Customer Name": "Alice", "drink": "Coffee", "qty": "1", "price": "2.50", "branch": "Main", "payment_type": "Card", "date_time": "2023-04-01 08:00:00", "id": "tx1"},
-        {"Customer Name": "Bob", "drink": "Tea", "qty": "1", "price": "3.00", "branch": "Branch A", "payment_type": "Cash", "date_time": "2023-04-01 09:00:00", "id": "tx2"}
+        {
+            "Date/Time": "2023-04-01 08:00:00",
+            "Branch": "Main",
+            "Customer Name": "Alice",
+            "Product": "coffee - 2.50",
+            "Price": "2.50",
+            "Payment Type": "Card",
+            "Card Number": "1234"
+        },
+        {
+            "Date/Time": "2023-04-01 09:00:00",
+            "Branch": "Branch A",
+            "Customer Name": "Bob",
+            "Product": "tea - 1.75",
+            "Price": "1.75",
+            "Payment Type": "Cash",
+            "Card Number": ""
+        }
     ]
-    result = process_transactions(sample_data)
-    assert isinstance(result, tuple) and len(result) == 4, f"Expected a 4-element tuple, got {result}"
-    final_transactions, second_normalised, third_normalised, final_again = result
-    assert isinstance(final_transactions, list), "Expected final_transactions to be a list."
-    assert isinstance(final_again, list), "Expected final_transactions (again) to be a list."
-    assert isinstance(second_normalised, tuple), "Expected second_normalised to be a tuple."
-    assert isinstance(third_normalised, tuple), "Expected third_normalised to be a tuple."
+
+    result: Dict[str, Any] = transform_data(sample_data)
+    
+    # check for that we get a dictionary
+    assert isinstance(result, dict), f"Expected result to be a dictionary, got {type(result)}"
+    
+    # Check for required top-level keys.
+    expected_keys = ["final_transactions", "branch_data", "product_data"]
+    for key in expected_keys:
+        assert key in result, f"Missing key '{key}' in transformed data."
+    
+    # Validate branch_data structure.
+    assert isinstance(result["branch_data"], dict), "branch_data should be a dictionary."
+    expected_branch_keys = ["branches_table", "transactions_with_branch_id"]
+    for sub_key in expected_branch_keys:
+        assert sub_key in result["branch_data"], f"Missing key '{sub_key}' in branch_data."
+    
+    # Validate product_data structure.
+    assert isinstance(result["product_data"], dict), "product_data should be a dictionary."
+    expected_product_keys = ["products_table", "transactions_with_product_id", "transaction_product_table"]
+    for sub_key in expected_product_keys:
+        assert sub_key in result["product_data"], f"Missing key '{sub_key}' in product_data."
+    
+    # Check that final_transactions is a non-empty list.
+    assert isinstance(result["final_transactions"], list), "final_transactions should be a list."
+    assert len(result["final_transactions"]) > 0, "Expected non-empty final_transactions."
+    print("Test overall transform_data: Passed")
 
 # -----------------------------
 # Section 7: Test write_csv
@@ -221,16 +270,19 @@ def test_write_normalised_csv_files() -> None:
         None.
     """
     # Sample normalised data.
-    final_transactions = [{"id": "tx1", "customer_name": "Alice"}]
-    branches_table = [{"id": "b1", "name": "Main"}]
-    transactions_with_branch_id = [{"id": "tx1", "branch_id": "b1", "customer_name": "Alice"}]
+    final_transactions: List[Dict[str, Any]] = [{"id": "tx1", "customer_name": "Alice"}]
+    branches_table: List[Dict[str, str]] = [{"id": "b1", "name": "Main"}]
+    transactions_with_branch_id: List[Dict[str, str]] = [{"id": "tx1", "branch_id": "b1", "customer_name": "Alice"}]
     second_normalised: Tuple[List[Dict[str, str]], List[Dict[str, str]]] = (branches_table, transactions_with_branch_id)
     
-    products_table = [{"id": "p1", "product_name": "coffee", "size": "", "flavour": "", "price": "2.50"}]
-    transactions_with_product_id = [{"id": "tx1", "product_id": "p1", "customer_name": "Alice"}]
-    transaction_product_table = [{"id": "tp1", "transaction_id": "tx1", "product_id": "p1"}]
-    third_normalised: Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]] = (products_table, transactions_with_product_id, transaction_product_table)
-    
+    products_table: List[Dict[str, str]] = [{"id": "p1", "product_name": "coffee", "size": "", "flavour": "", "price": "2.50"}]
+    transactions_with_product_id: List[Dict[str, Any]] = [{"id": "tx1", "product_id": "p1", "customer_name": "Alice"}]
+    transaction_product_table: List[Dict[str, str]] = [{"id": "tp1", "transaction_id": "tx1", "product_id": "p1"}]
+    third_normalised: Tuple[List[Dict[str, str]], List[Dict[str, Any]], List[Dict[str, str]]] = (
+        products_table,
+        transactions_with_product_id,
+        transaction_product_table
+    )
     # Create a temporary directory for output files.
     temp_output: str = tempfile.mkdtemp()
     
@@ -278,3 +330,6 @@ def test_write_normalised_csv_files() -> None:
     for fname in expected_files:
         file_path: str = os.path.join(temp_output, fname)
         assert os.path.exists(file_path), f"Expected file {file_path} does not exist."
+
+
+

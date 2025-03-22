@@ -119,6 +119,7 @@ def extract_data(file_input: Union[str, StringIO], has_header: bool = True) -> O
                     "card_number": card_number,
                     "date_time": row["Date/Time"].strip()
                 }
+                logger.debug(f"Mapped row: {mapped_row}")
                 parsed_data.append(mapped_row)
             except KeyError as e:
                 logger.warning(f"Row {row_number} skipped due to missing field: {e}")

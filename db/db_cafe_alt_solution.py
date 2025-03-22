@@ -66,14 +66,13 @@ def load_data(transformed_data: Dict[str, Any]) -> None:
 
                 # Insert transactions table
                 transaction_query = """
-                    INSERT INTO transactions (id, branch_id, date_time price, qty, payment_type)
+                    INSERT INTO transactions (branch_id, date_time price, qty, payment_type)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """
                 cursor.executemany(
                     transaction_query,
                     [
                         (
-                            t["id"],
                             t["branch_id"],
                             t["date_time"],
                             t["price"],

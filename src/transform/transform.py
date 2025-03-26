@@ -188,6 +188,8 @@ def normalise_products(transactions: List[Dict[str, Any]]) -> Tuple[List[Dict[st
     updated_transactions: List[Dict[str, Any]] = []
     transaction_product_table: List[Dict[str, str]] = []
     product_ids: Dict[tuple, str] = {}
+    price_tracker: Dict[Tuple[str, str, str], Dict[str, float]] = {}
+
 
     for record in transactions:
         parsed_products = record.get("parsed_products")
@@ -202,16 +204,29 @@ def normalise_products(transactions: List[Dict[str, Any]]) -> Tuple[List[Dict[st
                 entry.get("size", "").lower(),
                 entry.get("flavour", "").lower()
             )
+            price = float(entry.get("price", 0))
+
             if key not in product_ids:
                 product_id = str(uuid4())
                 product_ids[key] = product_id
+                price_tracker[key] = {"total": price, "count": 1}
                 products_table.append({
                     "id": product_id,
                     "product_name": entry.get("product_name", ""),
                     "size": entry.get("size", ""),
                     "flavour": entry.get("flavour", ""),
-                    "price": str(entry.get("price", "0"))
+                    "price": f"{price:.2f}"
                 })
+            else:
+                price_tracker[key]["total"] += price
+                price_tracker[key]["count"] += 1
+                avg_price = price_tracker[key]["total"] / price_tracker[key]["count"]
+
+                for product in products_table:
+                    if product["id"] == product_ids[key]:
+                        product["price"] = f"{avg_price:.2f}"
+                        break
+
             current_product_ids.append(product_ids[key])
             transaction_product_table.append({
                 "id": str(uuid4()),

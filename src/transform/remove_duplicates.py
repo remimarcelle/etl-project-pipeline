@@ -37,7 +37,7 @@ def deduplicate_data(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
                     v = tuple(sorted(v.items()))
                 safe_row[k] = v
 
-            unique_key = tuple(sorted(safe_row.items())
+            unique_key = tuple(sorted(safe_row.items()))
             if unique_key not in seen:
                 seen.add(unique_key)
                 unique_data.append(row)

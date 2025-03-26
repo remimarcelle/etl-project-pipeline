@@ -251,24 +251,41 @@ def transform_data(data: List[Dict[str, str]]) -> Dict[str, Any]:
     """
     try:
         logger.info("Starting transaction processing...")
+
+        # step 1. Remove sensitive information.
+        cleaned_records = remove_pii(data)
+        logger.info(f"Sensitive information removed from {len(data)} records.")
         
-        # Filter out records missing required fields.
-        valid_records = [r for r in data if all(r.get(k, "").strip() for k in [
-            "Customer Name", "product", "qty", "price", "branch", "payment_type", "date_time"
-        ])]
+        # step 2. Filter out records missing required fields.
+        valid_records = [r for r in cleaned_records if all(r.get(k, "").strip() for k in [
+    "product", "qty", "price", "branch", "payment_type", "date_time"
+])]
         logger.info(f"{len(valid_records)} records remain after filtering for required fields.")
+
+        if not valid_records:
+            logger.warning("No valid records found after filtering. Exiting transformation early.")
+            return {
+                "final_transactions": [],
+                "branch_data": {
+                    "branches_table": [],
+                    "transactions_with_branch_id": []
+        },
+        "product_data": {
+            "products_table": [],
+            "transactions_with_product_id": [],
+            "transaction_product_table": []
+        }
+    }
         
-        # Parse the 'product' field.
+        # step 3. Parse the 'product' field.
         parsed_records = [parse_product_field(record) for record in valid_records]
+        if parsed_records:
+            logger.debug(f"First parsed record: {parsed_records[0]}")
         logger.info("Product field parsing complete.")
         
-        # Remove sensitive information.
-        cleaned_records = remove_pii(parsed_records)
-        logger.info("Sensitive information removed from records.")
-        
         # Remove duplicate records.
-        first_normalised_form = deduplicate_data(cleaned_records)
-        logger.info(f"Deduplication complete: {len(first_normalised_form)} unique records remain.")
+        first_normalised_form = deduplicate_data(parsed_records)
+        logger.info(f"Duplication eradictor process complete: {len(first_normalised_form)} unique records remain.")
         
         # Normalise branch data.
         branches_table, transactions_with_branch_id = normalise_branches(first_normalised_form)
@@ -298,7 +315,18 @@ def transform_data(data: List[Dict[str, str]]) -> Dict[str, Any]:
         }
     except Exception as e:
         logger.error(f"Failed to process transactions: {e}")
-        raise
+        return {
+            "final_transactions": [],
+            "branch_data": {
+                "branches_table": [],
+                "transactions_with_branch_id": []
+            },
+            "product_data": {
+                "products_table": [],
+                "transactions_with_product_id": [],
+                "transaction_product_table": []
+            }
+        }
 
 def write_csv(data: List[Dict[str, Any]], filename: str) -> None:
     """

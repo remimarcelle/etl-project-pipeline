@@ -1,8 +1,8 @@
 {
     "known_sizes": ["small", "regular", "large"],
-    "required_fields": ["customer_name", "product", "qty", "price", "branch", "payment_type", "date_time"],
+    "required_fields": ["product", "qty", "price", "branch", "payment_type", "date_time"],
     "default_headers": ["Date/Time", "Branch", "Customer Name", "Product", "Price", "Payment Type", "Card Number"],
-      "default_qty": "1"
+    "default_qty": "1"
     
   }
   

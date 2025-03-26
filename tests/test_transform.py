@@ -5,6 +5,7 @@ import tempfile
 from io import StringIO
 from typing import List, Dict, Any, Tuple
 from uuid import uuid4
+from src.extract.extract import extract_data
 
 import pytest
 
@@ -16,7 +17,7 @@ if not logger.handlers:
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-# Import the transformation functions from your transform module.
+# Import the transformation functions from transform module.
 from src.transform.transform import (
     standardise_product_name,
     parse_product_field,
@@ -187,24 +188,27 @@ def test_transform_data() -> None:
     """
     sample_data: List[Dict[str, str]] = [
         {
-            "Date/Time": "2023-04-01 08:00:00",
-            "Branch": "Main",
-            "Customer Name": "Alice",
-            "Product": "coffee - 2.50",
-            "Price": "2.50",
-            "Payment Type": "Card",
-            "Card Number": "1234"
+            "customer_name": "Alice",
+            "product": "coffee - 2.50",
+            "qty": "1",
+            "price": "2.50",
+            "branch": "Main",
+            "payment_type": "Card",
+            "card_number": "1234",
+            "date_time": "2023-04-01 08:00:00"
         },
         {
-            "Date/Time": "2023-04-01 09:00:00",
-            "Branch": "Branch A",
-            "Customer Name": "Bob",
-            "Product": "tea - 1.75",
-            "Price": "1.75",
-            "Payment Type": "Cash",
-            "Card Number": ""
+            "customer_name": "Bob",
+            "product": "tea - 1.75",
+            "qty": "1",
+            "price": "1.75",
+            "branch": "Branch A",
+            "payment_type": "Cash",
+            "card_number": "",
+            "date_time": "2023-04-01 09:00:00"
         }
     ]
+
 
     result: Dict[str, Any] = transform_data(sample_data)
     
@@ -231,7 +235,7 @@ def test_transform_data() -> None:
     # Check that final_transactions is a non-empty list.
     assert isinstance(result["final_transactions"], list), "final_transactions should be a list."
     assert len(result["final_transactions"]) > 0, "Expected non-empty final_transactions."
-    print("Test overall transform_data: Passed")
+    print("test_transform_data passed with correct structure.")
 
 # -----------------------------
 # Section 7: Test write_csv
@@ -331,5 +335,21 @@ def test_write_normalised_csv_files() -> None:
         file_path: str = os.path.join(temp_output, fname)
         assert os.path.exists(file_path), f"Expected file {file_path} does not exist."
 
+def test_etl_flow_on_real_csv() -> None:
+    """
+    Integration test that simulates the real ETL flow using a raw CSV file
+    located at 'data/raw_data.csv'.
+    """
+    file_path = os.path.join("data", "raw_data.csv")
+    assert os.path.exists(file_path), f"Missing test file: {file_path}"
 
+    extracted = extract_data(file_path)
+    assert extracted is not None and len(extracted) > 0, "Extraction failed or returned empty data."
+
+    transformed = transform_data(extracted)
+    assert isinstance(transformed, dict), "Expected dict result from transform_data()."
+    assert "final_transactions" in transformed, "Missing key: final_transactions"
+    assert len(transformed["final_transactions"]) > 0, "No valid transactions after transform."
+
+    print
 

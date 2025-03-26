@@ -19,13 +19,25 @@ def deduplicate_data(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
     Raises:
         Exception: If an unexpected error occurs during removal of duplicates.
     """
+    seen: Set[Tuple[Tuple[str, str], ...]] = set()
+    unique_data: List[Dict[str, Any]] = []
+
     try:
         logger.info("Starting removal of duplicate data...")
-        seen = set()
-        unique_data = []
         for row in data:
-            # Create a tuple of sorted key-value pairs. Sorting ensures the order doesn't affect equality.
-            unique_key = tuple(row.items())
+            safe_row = {}
+            for k, v in row.items():
+                if isinstance(v, list):
+                    # If it's a list of dicts, convert each dict to sorted tuple
+                    if all(isinstance(item, dict) for item in v):
+                        v = tuple(tuple(sorted(item.items())) for item in v)
+                    else:
+                        v = tuple(v)
+                elif isinstance(v, dict):
+                    v = tuple(sorted(v.items()))
+                safe_row[k] = v
+
+            unique_key = tuple(sorted(safe_row.items())
             if unique_key not in seen:
                 seen.add(unique_key)
                 unique_data.append(row)

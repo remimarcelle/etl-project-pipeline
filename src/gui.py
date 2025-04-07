@@ -31,6 +31,8 @@ class ETLApp:
         self.create_menu()
         self.create_widgets()
         self.etl_thread = None
+        self.stop_event = threading.Event()
+        self.process = None
 
     def create_menu(self) -> None:
         """
@@ -125,6 +127,9 @@ class ETLApp:
         Args:
             file_paths (Optional[List[str]]): List of CSV file paths to process.
         """
+        """ this makes sure every new ETL run starts fresh without any
+        leftover stop flags from previous runs"""
+        self.stop_event.clear()
         # Update buttons and status
         self.run_button.config(state="disabled")
         self.stop_button.config(state="normal")
@@ -136,46 +141,115 @@ class ETLApp:
         self.etl_thread = threading.Thread(target=self.run_etl_pipeline, args=(file_paths,))
         self.etl_thread.start()
 
-    def stop_etl(self):
-        """
-        Displays a placeholder for stopping the ETL (not implemented).
-        """
-        # For now, we'll simply simulate a stop action as proper termination might require process management
-        messagebox.showinfo("Stop programme", "Stop functionality is not implemented yet.")
-        self.run_button.config(state="normal")
-        self.stop_button.config(state="disabled")
-        self.progress.stop()
-        self.status_label.config(text="Status: Idle")
+    # def stop_etl(self):
+    #     """
+    #     Displays a placeholder for stopping the ETL (not implemented). COMMENTED IT OUT BECAUSE
+    #     ITS A PLACEHOLDER AND WILL BE USEFUL FOR ANOTHER TIME.
+    #     """
+    #     # For now, we'll simply simulate a stop action as proper termination might require process management
+    #     messagebox.showinfo("Stop programme", "Stop functionality is not implemented yet.")
+    #     self.run_button.config(state="normal")
+    #     self.stop_button.config(state="disabled")
+    #     self.progress.stop()
+    #     self.status_label.config(text="Status: Idle")
+
+def stop_etl(self) -> None:
+    """
+    Stops the ETL pipeline if it's currently running.
+    """
+    if self.etl_thread and self.etl_thread.is_alive():
+        self.log("Stop requested. Attempting to terminate ETL process...")
+        self.status_label.config(text="Status: Stopping...")
+        self.stop_event.set()
+
+        if self.process and self.process.poll() is None:
+            try:
+                self.process.terminate()
+            except Exception as e:
+                self.log(f"Failed to terminate process: {e}")
+
+
+    # def run_etl_pipeline(self, file_paths: Optional[List[str]] = None) -> None:
+    #     """
+    #     Runs the ETL pipeline via subprocess.
+
+    #     Args:
+    #         file_paths (Optional[List[str]]): Optional list of CSV file paths.
+    #     """
+    #     try:
+    #         # Run your ETL pipeline by calling app.py (which orchestrates the ETL process)
+    #         # It's assumed that app.py lives in src/ and is executable via: python src/app.py
+    #         # The subprocess.run call captures the pipeline's output.
+    #         command = ["python", "src/app.py"]
+    #         if file_paths:
+    #             command.extend(file_paths)
+
+    #         process = subprocess.run(
+    #             command,
+    #             capture_output=True, text=True, check=True
+    #         )
+    #         if process.stdout:
+    #             self.log(process.stdout)
+    #         if process.stderr:
+    #             self.log("Errors:\n" + process.stderr)
+    #         self.log("ETL pipeline finished successfully!")
+    #         self.status_label.config(text="Status: Completed")
+    #     except subprocess.CalledProcessError as e:
+    #         self.log("ETL pipeline failed:")
+    #         self.log(e.stderr)
+    #         self.status_label.config(text="Status: Error")
+    #     except Exception as ex:
+    #         self.log("Unexpected error: " + str(ex))
+    #         self.status_label.config(text="Status: Error")
+    #     finally:
+    #         self.run_button.config(state="normal")
+    #         self.stop_button.config(state="disabled")
+    #         self.progress.stop()
 
     def run_etl_pipeline(self, file_paths: Optional[List[str]] = None) -> None:
         """
-        Runs the ETL pipeline via subprocess.
+        Runs the ETL pipeline via subprocess with support for early termination.
 
         Args:
             file_paths (Optional[List[str]]): Optional list of CSV file paths.
         """
         try:
-            # Run your ETL pipeline by calling app.py (which orchestrates the ETL process)
-            # It's assumed that app.py lives in src/ and is executable via: python src/app.py
-            # The subprocess.run call captures the pipeline's output.
             command = ["python", "src/app.py"]
             if file_paths:
                 command.extend(file_paths)
 
-            process = subprocess.run(
+            self.process = subprocess.Popen(
                 command,
-                capture_output=True, text=True, check=True
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
             )
-            if process.stdout:
-                self.log(process.stdout)
-            if process.stderr:
-                self.log("Errors:\n" + process.stderr)
-            self.log("ETL pipeline finished successfully!")
-            self.status_label.config(text="Status: Completed")
-        except subprocess.CalledProcessError as e:
-            self.log("ETL pipeline failed:")
-            self.log(e.stderr)
-            self.status_label.config(text="Status: Error")
+
+            # Wait loop with cancellation support
+            while True:
+                if self.stop_event.is_set():
+                    self.log("ETL pipeline interrupted by user.")
+                    self.process.terminate()
+                    break
+
+                retcode = self.process.poll()
+                if retcode is not None:  # Process finished
+                    stdout, stderr = self.process.communicate()
+                    if stdout:
+                        self.log(stdout)
+                    if stderr:
+                        self.log("Errors:\n" + stderr)
+
+                    if retcode == 0:
+                        self.log("ETL pipeline finished successfully!")
+                        self.status_label.config(text="Status: Completed")
+                    else:
+                        self.log("ETL pipeline failed!")
+                        self.status_label.config(text="Status: Error")
+                    break
+
+                time.sleep(0.2)
+
         except Exception as ex:
             self.log("Unexpected error: " + str(ex))
             self.status_label.config(text="Status: Error")
@@ -183,6 +257,7 @@ class ETLApp:
             self.run_button.config(state="normal")
             self.stop_button.config(state="disabled")
             self.progress.stop()
+            self.status_label.config(text="Status: Idle")
 
     def log(self, message: str) -> None:
         # Append log messages with a timestamp to the log_text widget

@@ -4,6 +4,7 @@ import sys
 print("Running from:", sys.executable)
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter import filedialog
 import threading
 import subprocess
 import time
@@ -56,7 +57,10 @@ class ETLApp:
         
         self.stop_button = tk.Button(control_frame, text="Stop ETL Pipeline", command=self.stop_etl, state="disabled", width=20)
         self.stop_button.pack(pady=10)
-        
+
+        self.upload_button = tk.Button(control_frame, text="Upload CSVs & Run", command=self.select_files_and_run, width=20)
+        self.upload_button.pack(pady=10)
+
         self.status_label = tk.Label(control_frame, text="Status: Idle", width=20, relief="groove")
         self.status_label.pack(pady=10)
         

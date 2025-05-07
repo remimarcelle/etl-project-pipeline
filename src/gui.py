@@ -1,21 +1,27 @@
 import os
 import platform
 import sys
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from dotenv import load_dotenv
+# Load environment variables for Windows-specific Tk/Tcl paths
+load_dotenv("db/.env")
+
+if platform.system() == "Windows":
+    tcl_path = os.getenv("TCL_LIBRARY")
+    tk_path = os.getenv("TK_LIBRARY")
+
+    if not tcl_path or not tk_path:
+        raise EnvironmentError("TCL_LIBRARY or TK_LIBRARY not set in .env")
+    
+    os.environ["TCL_LIBRARY"] = tcl_path
+    os.environ["TK_LIBRARY"] = tk_path
+
+print("Running from:", sys.executable)
 from typing import Optional, List
 import threading
 import subprocess
 import time
-from dotenv import load_dotenv
-
-# Load environment variables for Windows-specific Tk/Tcl paths
-load_dotenv()
-if platform.system() == "Windows":
-    os.environ.setdefault("TCL_LIBRARY", os.getenv("TCL_LIBRARY", ""))
-    os.environ.setdefault("TK_LIBRARY", os.getenv("TK_LIBRARY", ""))
-
-print("Running from:", sys.executable)
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
 
 class ETLApp:
     def __init__(self, root: tk.Tk) -> None:
@@ -46,7 +52,7 @@ class ETLApp:
         
         # File menu for running ETL and exiting
         file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label="Run Programme", command=lambda: self.start_etl())
+        file_menu.add_command(label="Run Test Dataset", command=lambda: self.start_etl())
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
         menubar.add_cascade(label="File", menu=file_menu)
@@ -54,6 +60,7 @@ class ETLApp:
         # Help menu with an About dialog
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="About", command=self.show_about)
+        help_menu.add_command(label="How to Use", command=self.show_help)
         menubar.add_cascade(label="Help", menu=help_menu)
 
     def show_about(self) -> None:
@@ -61,6 +68,16 @@ class ETLApp:
         Displays information about the program.
         """
         messagebox.showinfo("About", "ETL Pipeline Runner v1.0\nDeveloped for RMB-DE-ETLproject Generation UK & Ireland 2025")
+
+    def show_help(self):
+        messagebox.showinfo(
+            "How to Use",
+            "1. Click 'Run ETL Pipeline' to choose CSV files to process.\n"
+            "2. The system will extract, clean, and upload your data to the database.\n"
+            "3. Test mode (no file selected) will skip database upload.\n"
+            "4. Visit http://localhost:8080 to view data in Adminer."
+        )
+
 
     def create_widgets(self) -> None:
         """
@@ -79,17 +96,26 @@ class ETLApp:
         log_frame.pack(side="right", fill="both", expand=True)
 
         # Control frame widgets
-        self.run_button = tk.Button(control_frame, text="Run ETL Pipeline", command=lambda: self.start_etl(), width=20)
+        self.run_button = tk.Button(control_frame, text="Run Test Dataset", command=lambda: self.start_etl(), width=20)
         self.run_button.pack(pady=10)
         
-        self.stop_button = tk.Button(control_frame, text="Stop ETL Pipeline", command=self.stop_etl, state="disabled", width=20)
+        self.stop_button = tk.Button(control_frame, text="Stop Processing", command=self.stop_etl, state="disabled", width=20)
         self.stop_button.pack(pady=10)
 
-        self.upload_button = tk.Button(control_frame, text="Upload CSVs & Run", command=self.select_files_and_run, width=20)
+        self.upload_button = tk.Button(control_frame, text="Run My Files", command=self.select_files_and_run, width=20)
         self.upload_button.pack(pady=10)
 
         self.status_label = tk.Label(control_frame, text="Status: Idle", width=20, relief="groove")
         self.status_label.pack(pady=10)
+
+        self.selected_files_label = tk.Label(
+            control_frame,
+            text="Selected file(s): None",
+            wraplength=180,
+            justify="left"
+        )
+        self.selected_files_label.pack(pady=(5, 10))
+
         
         self.progress = ttk.Progressbar(control_frame, orient="horizontal", mode="indeterminate", length=150)
         self.progress.pack(pady=10)
@@ -111,24 +137,30 @@ class ETLApp:
         """
         file_paths: List[str] = list(
             filedialog.askopenfilenames(
-                title="Upload CSV files",
+                title="Select csv files to process",
                 filetypes=[("CSV Files", "*.csv")]
             )
         )
         if file_paths:
+            display_paths = "\n".join([os.path.basename(path) for path in file_paths])
+            self.selected_files_label.config(text=f"Selected file(s):\n{display_paths}")
             self.start_etl(list(file_paths))
         else:
+            self.selected_files_label.config(text="Selected file(s): None")
             messagebox.showwarning("No Selection", "No files were selected.")
 
     def start_etl(self, file_paths: Optional[List[str]] = None) -> None:
         """
-        Starts the ETL pipeline in a separate thread.
+        Starts the ETL pipeline in a background thread.
+
+        This method ensures that each ETL run begins with a clean state by clearing any
+        previous stop flags. It then disables the Run button, enables the Stop button,
+        updates the status label, shows the progress bar, and starts a new thread to
+        run the ETL subprocess asynchronously.
 
         Args:
-            file_paths (Optional[List[str]]): List of CSV file paths to process.
-        """
-        """ this makes sure every new ETL run starts fresh without any
-        leftover stop flags from previous runs"""
+            file_paths (Optional[List[str]]): List of CSV file paths to process. If None,
+            app.py will use its own default dataset logic."""
         self.stop_event.clear()
         # Update buttons and status
         self.run_button.config(state="disabled")
@@ -153,20 +185,36 @@ class ETLApp:
     #     self.progress.stop()
     #     self.status_label.config(text="Status: Idle")
 
-def stop_etl(self) -> None:
-    """
-    Stops the ETL pipeline if it's currently running.
-    """
-    if self.etl_thread and self.etl_thread.is_alive():
-        self.log("Stop requested. Attempting to terminate ETL process...")
-        self.status_label.config(text="Status: Stopping...")
-        self.stop_event.set()
+    def stop_etl(self) -> None:
+        """
+        Attempts to stop the currently running ETL subprocess.
 
-        if self.process and self.process.poll() is None:
-            try:
-                self.process.terminate()
-            except Exception as e:
-                self.log(f"Failed to terminate process: {e}")
+        This method checks if the ETL thread (self.etl_thread) is still alive,
+        and if so, sets a thread-safe stop_event flag to signal the ETL loop to exit.
+        If a subprocess (self.process) is still active, it attempts to terminate it using .terminate().
+
+        After attempting to stop the process, this method also resets GUI buttons and status indicators.
+
+        Note:
+        This method only works correctly if run_etl_pipeline has saved a reference
+        to self.process using subprocess.Popen().
+
+        Args:
+            None
+
+        Raises:
+            No exception is raised if the process is already terminated, but a log entry is made.
+        """
+        if self.etl_thread and self.etl_thread.is_alive():
+            self.log("Stop requested. Attempting to terminate ETL process...")
+            self.status_label.config(text="Status: Stopping...")
+            self.stop_event.set()
+
+            if self.process and self.process.poll() is None:
+                try:
+                    self.process.terminate()
+                except Exception as e:
+                    self.log(f"Failed to terminate process: {e}")
 
 
     # def run_etl_pipeline(self, file_paths: Optional[List[str]] = None) -> None:
@@ -208,15 +256,26 @@ def stop_etl(self) -> None:
 
     def run_etl_pipeline(self, file_paths: Optional[List[str]] = None) -> None:
         """
-        Runs the ETL pipeline via subprocess with support for early termination.
+        Runs the ETL pipeline via subprocess with using the same
+        Python interpreter as the GUI.
+
+        This method constructs the ETL command using sys.executable to ensure it runs in
+        the same virtual environment or interpreter as the GUI. It launches app.py with any
+        provided CSV file paths via subprocess.Popen(), and stores the process reference in
+        self.process so it can be terminated later by the stop_etl() method.
 
         Args:
-            file_paths (Optional[List[str]]): Optional list of CSV file paths.
+            file_paths (Optional[List[str]]): List of CSV file paths selected by the user.
+            If None, the app will run on the default dataset defined inside app.py.
         """
         try:
-            command = ["python", "src/app.py"]
+            command = [sys.executable, "src/app.py"]
             if file_paths:
                 command.extend(file_paths)
+
+            self.log(f"Launching ETL with: {command}")
+            self.log(f"Using Python interpreter: {sys.executable}")
+
 
             self.process = subprocess.Popen(
                 command,

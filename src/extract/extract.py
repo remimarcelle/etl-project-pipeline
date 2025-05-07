@@ -11,6 +11,7 @@ logger = get_logger("extract", log_level=logging.DEBUG)  # Creates extract.log
 
 # Load configuration
 config = load_config()
+default_qty = config.get("default_qty", "1")
 
 def extract_data(file_input: Union[str, StringIO], has_header: bool = True) -> Optional[List[Dict[str, str]]]:
     """

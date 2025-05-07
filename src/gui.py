@@ -24,14 +24,15 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 class ETLApp:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: tk.Tk, test_mode: bool = False) -> None:
         """
         Initialises the ETLApp GUI.
 
         Args:
-            root (tk.Tk): The root window of the application.
-        """
+               root (tk.Tk): The root window of the application.
+         """
         self.root = root
+        self.test_mode = test_mode
         self.root.title("ETL Pipeline Runner")
         self.root.geometry("800x500")
         self.create_menu()
@@ -321,8 +322,12 @@ class ETLApp:
     def log(self, message: str) -> None:
         # Append log messages with a timestamp to the log_text widget
         timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
-        self.log_text.insert("end", f"{timestamp} {message}\n")
-        self.log_text.see("end")  # Automatically scroll to the bottom
+        full_msg = "end", f"{timestamp} {message}\n"
+        if self.test_mode:
+            print(full_msg)  # Visible in pytest terminal output
+        else:
+            self.log_text.insert("end", full_msg)
+            self.log_text.see("end")  
 
 if __name__ == "__main__":
     root = tk.Tk()

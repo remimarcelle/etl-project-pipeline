@@ -85,7 +85,7 @@ In the interface:
 
 | Field     | Value                         |
 |-----------|-------------------------------|
-| Server    | db                            |
+| Server    | mysql                            |
 | Username  | root                          |
 | Password  | *(from `.env`)*               |
 | Database  | cafe |

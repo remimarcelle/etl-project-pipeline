@@ -18,6 +18,7 @@ This project is a complete ETL (Extract, Transform, Load) pipeline designed for 
 ## GUI Demo
 
 ![GUI Screenshot](https://github.com/user-attachments/assets/7ddcb55e-719f-42dc-bd4f-5e1bd96495dc)
+
 ![GUI SCREENSHOT 2](https://github.com/user-attachments/assets/710b7f4a-e5dc-4785-9fe0-1c337d0f124d)
 
 ---
@@ -35,22 +36,54 @@ This project is a complete ETL (Extract, Transform, Load) pipeline designed for 
 
 ## Project Structure
 ```
-etl-project/
-├── data/                   # Raw input CSVs
+etl-project-pipeline/
+├── data/
 │   └── raw-data.csv
-├── output/                 # Output (transformed) CSVs
+├── output/
 ├── db/
-│   ├── .env                # Database credentials
-│   ├── docker-compose.yml  # Docker setup for MySQL + Adminer
-│   └── db-loadsql.sql      # Table creation script
+│   ├── .env
+│   ├── db-loadsql.sql
+│   ├── db-seed.sql
+│   ├── dbsetup.txt
+│   ├── docker-compose.yml
+│   ├── Dockerfile
+│   └── db_cafe_alt_solution.py
+├── logs/
+│   ├── app.log
+│   ├── db.inspect.log
+│   ├── db.db_cafe_alt_solution.log
+│   ├── extract.log
+│   ├── load.log
+│   ├── logger.log
+│   ├── remove_duplicates.log
+│   ├── remove_sensitive_data.log
+│   ├── test_transform.log
+│   └── transform.log
+├── monitoring/
+│   ├── cloudwatch-config.json
+│   └── grafana-dashboard.json
+├── redundcode/
 ├── src/
-│   ├── app.py              # ETL controller
-│   ├── gui.py              # Tkinter GUI
-│   ├── extract/            # CSV extraction logic
-│   ├── transform/          # Cleaning, PII removal, normalisation
-│   └── db/                 # Database loader
+│   ├── app.py
+│   ├── gui.py
+│   ├── extract/
+│   │   └── extract.py
+│   ├── transform/
+│   │   ├── transform.py
+│   │   ├── remove_duplicates.py
+│   │   └── remove_sensitive_data.py
 ├── tests/
-│   └── test_gui.py         # Optional GUI test (Tkinter threads may interfere)
+│   ├── test_gui.py
+│   └── ...
+├── utils/
+│   ├── config_loader.py
+│   └── logger.py
+├── config.json
+├── requirements.txt
+├── pytest.ini
+├── .gitignore
+└── README.md
+
 ```
 
 ## How to Run the App
@@ -65,7 +98,7 @@ docker-compose up -d
 
 This starts:
 
-- MySQL container (host: `db`, port: `3306`)
+- MySQL container (host: `mysql`, port: `3306`)
 - Adminer container (port `8080`)
 
 ### 2. Launch the GUI

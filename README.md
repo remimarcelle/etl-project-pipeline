@@ -17,7 +17,8 @@ This project is a complete ETL (Extract, Transform, Load) pipeline designed for 
 
 ## GUI Demo
 
-(![GUI Screenshot](https://github.com/user-attachments/assets/7ddcb55e-719f-42dc-bd4f-5e1bd96495dc)
+![GUI Screenshot](https://github.com/user-attachments/assets/7ddcb55e-719f-42dc-bd4f-5e1bd96495dc)
+![GUI SCREENSHOT 2](https://github.com/user-attachments/assets/710b7f4a-e5dc-4785-9fe0-1c337d0f124d)
 
 ---
 

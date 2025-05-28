@@ -72,6 +72,14 @@ def run_etl_pipeline(file_paths: List[str]) -> bool:
             logger.warning("Transformation produced no data. ETL pipeline terminating gracefully.")
             return False  # Graceful exit when transformation fails or produces no meaningful output
         logger.info(f"Transformation successful. Keys in transformed data: {list(transformed_data.keys())}")
+        
+        # Log summary stats
+        record_count = len(transformed_data.get("final_transactions", []))
+        branch_count = len(transformed_data.get("branch_data", {}).get("branches_table", []))
+        product_count = len(transformed_data.get("product_data", {}).get("products_table", []))
+        transaction_link_count = len(transformed_data.get("product_data", {}).get("transaction_product_table", []))
+        logger.info(f"Summary: {record_count} final transaction(s), {branch_count} branch(es), "
+                    f"{product_count} product(s), {transaction_link_count} transaction-product link(s).")
 
         # Load data into the database using the consolidated load_data function.
         if using_test_file:
